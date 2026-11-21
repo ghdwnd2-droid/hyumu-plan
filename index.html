@@ -118,6 +118,7 @@ td.c.D{background:var(--off-bg)} td.c.D button{color:var(--off)}
 td.c.W button::after{content:"";position:absolute;right:3px;top:4px;width:6px;height:6px;border-radius:50%;background:var(--off)}
 td.c.S button{color:var(--shift)}
 td.c.L button{color:var(--label);font-size:11px;font-weight:700;letter-spacing:-.04em}
+td.c.T button{color:var(--ink);font-weight:500;letter-spacing:-.06em}
 td.c.viol{box-shadow:inset 0 0 0 2px var(--bad)}
 .blk .sum{font-weight:700;border-left:1px solid var(--ink);font-size:14px}
 td.sum.bad{color:var(--bad);background:var(--bad-bg)}
@@ -216,7 +217,7 @@ body.m.view .savebox{display:none}
 <body>
 <main>
   <header class="mast">
-    <div class="savebox"><button class="btn primary" id="saveDoc">한글에서 여는 파일로 저장</button><span class="muted" id="saveMsg"></span></div>
+    <div class="savebox"><button class="btn primary" id="saveDoc">엑셀 파일로 저장</button><span class="muted" id="saveMsg"></span></div>
     <div class="store" id="store"></div>
     <div class="nav">
       <button class="navbtn" id="prev">‹ 이전 달</button>
@@ -249,6 +250,8 @@ body.m.view .savebox{display:none}
     <div class="palette" id="palette" role="group" aria-label="입력할 값"></div>
     <p class="grp">다른 일정</p>
     <div class="palette" id="palette2"></div>
+    <p class="grp">시각으로 적는 직원 (출근 또는 퇴근 시각)</p>
+    <div class="palette" id="palette3"></div>
     <p class="now" id="brushNow"></p>
   </section>
 
@@ -305,7 +308,9 @@ body.m.view .savebox{display:none}
 const KEY='hyumu-plan-v1';
 const LABELS=['연차','검진','교육','노조','병가','회의','근속','안전','감정'];
 const REST=new Set(['D','연차','병가','근속']);      // 쉬는 날로 보는 값
-const WORK=new Set(['','A','B','C']);                 // 출근으로 보는 값
+const WORK=new Set(['','A','B','C']);
+const isTime=v=>/^\d{1,2}:\d{2}$/.test(v);
+const isWork=v=>WORK.has(v)||isTime(v);   // 시각(예: 12:00)이 적힌 칸도 출근                 // 출근으로 보는 값
 const FIXED_HOL=['01-01','03-01','05-05','06-06','08-15','10-03','10-09','12-25'];
 const DOW=['일','월','화','수','목','금','토'];
 // Cloudflare 서버 주소를 아래 따옴표 안에 넣습니다. 예: 'https://hyumu.내이름.workers.dev'
@@ -363,7 +368,7 @@ function check(k){
   const aBad=[],bBad=[];
   for(let d=1;d<=n;d++){
     let p=0,a=0,b=0;
-    for(const s of mo.staff){const x=v(s.id,d);if(WORK.has(x))p++;if(x==='A')a++;if(x==='B')b++}
+    for(const s of mo.staff){const x=v(s.id,d);if(isWork(x))p++;if(x==='A')a++;if(x==='B')b++}
     r.present[d]=p;r.need[d]=need(d);
     if(mo.closed.includes(d))continue;
     if(p<need(d)){r.bad.push(`${d}일: 출근 ${p}명 (최소 ${need(d)}명)`);r.dayBad.add(d)}
@@ -385,7 +390,7 @@ function check(k){
     let run=0,start=0;
     for(let d=from;d<=n+1;d++){
       let w=false;
-      if(d<=n){const x=d>=1?v(s.id,d):(pm.cells[s.id+'|'+(pn+d)]||'');w=WORK.has(x)}
+      if(d<=n){const x=d>=1?v(s.id,d):(pm.cells[s.id+'|'+(pn+d)]||'');w=isWork(x)}
       if(w){if(!run)start=d;run++}
       else{
         if(run>st.max&&d-1>=1)r.bad.push(`${s.name}: ${Math.max(start,1)}~${d-1}일 ${run}일 연속 근무 (최대 ${st.max}일${start<1?', 지난달부터 이어짐':''})`);
@@ -410,7 +415,7 @@ function calHtml(k,mo,r,id){
     const w=dow(k,d),key=id+'|'+d,v=mo.cells[key]||'';
     if(v)cnt[v]=(cnt[v]||0)+1;
     const cls=['c'];
-    if(v==='D')cls.push('D');else if(v==='A'||v==='B'||v==='C')cls.push('S');else if(v)cls.push('L');
+    if(v==='D')cls.push('D');else if(v==='A'||v==='B'||v==='C')cls.push('S');else if(isTime(v))cls.push('L','T');else if(v)cls.push('L');
     if(v==='D'&&mo.wish[key])cls.push('W');
     if(r.cellBad.has(key))cls.push('viol');
     if(mo.closed.includes(d))cls.push('closed');else if(w===0||w===6||mo.hol.includes(d))cls.push('hol');
@@ -476,7 +481,8 @@ function render(){
   $('palette').innerHTML=chip('W','희망 휴무','d')+chip('D','휴무 D','d')+chip('A','A 시차','s')+chip('B','B 시차','s')+
     (st.useC?chip('C','C 시차','s'):'')+chip('연차','연차')+chip('교육','교육')+chip('검진','검진')+chip('','지우기','erase');
   $('palette2').innerHTML=['노조','병가','회의','근속','안전','감정'].map(l=>chip(l,l)).join('')+chip('custom','직접 입력')+
-    `<input type="text" id="customLabel" maxlength="3" placeholder="3자 이내" aria-label="직접 입력할 글자" value="${esc(S.custom||'')}">`;
+    `<input type="text" id="customLabel" maxlength="5" placeholder="5자 이내" aria-label="직접 입력할 글자" value="${esc(S.custom||'')}">`;
+  $('palette3').innerHTML=['11:00','11:30','12:00','18:30','20:00','20:30'].map(t=>chip(t,t)).join('');
   const bl=brush==='custom'?(S.custom?`직접 입력 "${S.custom}"`:'직접 입력 (옆 칸에 글자를 먼저 적으세요)'):(brush in BR?BR[brush]:brush);
   $('brushNow').textContent=`지금 고른 것: ${bl}`;
 
@@ -506,7 +512,7 @@ function render(){
       for(let d=d0;d<=d1;d++){
         const key=s.id+'|'+d,v=mo.cells[key]||'';
         const cls=['c'];
-        if(v==='D')cls.push('D');else if(v==='A'||v==='B'||v==='C')cls.push('S');else if(v)cls.push('L');
+        if(v==='D')cls.push('D');else if(v==='A'||v==='B'||v==='C')cls.push('S');else if(isTime(v))cls.push('L','T');else if(v)cls.push('L');
         if(v==='D'&&mo.wish[key])cls.push('W');
         if(r.cellBad.has(key))cls.push('viol');
         h+=`<td class="${cls.join(' ')}"><button data-c="${key}" aria-label="${esc(s.name)} ${d}일 ${v||'근무'}${mo.wish[key]?' 희망':''}">${esc(v)}</button></td>`;
@@ -592,7 +598,7 @@ function render(){
     <strong>같이 쉬면 안 되는 직원</strong>
     ${st.pairs.map((p,i)=>`<div class="row"><span>${nm(p[0])} · ${nm(p[1])}</span><button class="btn small danger" data-delpair="${i}">삭제</button></div>`).join('')||'<span class="muted">정한 조합이 없습니다.</span>'}
     <div class="row">${sel('pairA')}${sel('pairB')}<button class="btn small primary" id="addPair">조합 추가</button></div>
-    <span class="muted">D·연차·병가·근속이 같은 날 겹치면 위반으로 표시합니다. 휴점일은 제외합니다. 출근 인원은 빈칸과 A·B·C만 셉니다.</span>
+    <span class="muted">D·연차·병가·근속이 같은 날 겹치면 위반으로 표시합니다. 휴점일은 제외합니다. 출근 인원은 빈칸, A·B·C, 시각(예: 12:00)이 적힌 칸을 셉니다.</span>
     <div class="row"><button class="btn small danger" id="reset">${pendingDel==='__reset'?'한 번 더 누르면 전부 지움':'처음 상태로 되돌리기'}</button></div>`;
 
   $('saveinfo').textContent=API?'':saveOk
@@ -619,7 +625,7 @@ function recommend(){
   for(let d=1;d<=n;d++){
     closed[d]=m.closed.includes(d);need[d]=m.minBy[d]!=null?m.minBy[d]:st.min;
     const w=dow(k,d);yellow[d]=w===0||w===6||m.hol.includes(d);
-    base[d]=m.staff.filter(s=>s.manual&&WORK.has(val(s.id,d))).length;
+    base[d]=m.staff.filter(s=>s.manual&&isWork(val(s.id,d))).length;
   }
   const fixed=sched.map(s=>{const a=[];for(let d=1;d<=n;d++)a[d]=val(s.id,d);return a});
   const free=fixed.map(a=>{const f=[];for(let d=1;d<=n;d++)if(!closed[d]&&a[d]==='')f.push(d);return f});
@@ -627,12 +633,12 @@ function recommend(){
   const pk=shift(k,-1),pm=S.months[pk],pn=pm?nDays(pk):0;
   const prevRun=sched.map(s=>{
     if(!pm||!pm.staff.some(q=>q.id===s.id))return 0;
-    let r=0;for(let d=pn;d>=1&&r<10;d--){if(WORK.has(pm.cells[s.id+'|'+d]||''))r++;else break}return r;
+    let r=0;for(let d=pn;d>=1&&r<10;d--){if(isWork(pm.cells[s.id+'|'+d]||''))r++;else break}return r;
   });
   const idx={};sched.forEach((s,i)=>idx[s.id]=i);
   const pairs=st.pairs.filter(p=>m.staff.some(s=>s.id===p[0])&&m.staff.some(s=>s.id===p[1]));
   let D;
-  const work=(i,d)=>fixed[i][d]===''?!D[i][d]:WORK.has(fixed[i][d]);
+  const work=(i,d)=>fixed[i][d]===''?!D[i][d]:isWork(fixed[i][d]);
   const rest=(i,d)=>fixed[i][d]===''?D[i][d]:REST.has(fixed[i][d]);
   const restId=(id,d)=>id in idx?rest(idx[id],d):REST.has(val(id,d));
   function cost(){
@@ -702,64 +708,71 @@ function recommend(){
   const r=check(k);
   recMsg=r.bad.length?`추천을 채웠지만 규칙 위반이 ${r.bad.length}건 남았습니다. 아래 "확인할 점"을 보세요.`:'추천을 채웠습니다. 규칙 위반이 없습니다.';
 }
-function docxXml(k){
+function xlsxSheet(k){
   const mo=S.months[k],n=nDays(k),[y,m]=ym(k),st=S.set;
-  const F='<w:rFonts w:ascii="맑은 고딕" w:hAnsi="맑은 고딕" w:eastAsia="맑은 고딕"/>';
-  const run=(t,o={})=>`<w:r><w:rPr>${F}${o.b?'<w:b/>':''}${o.c?`<w:color w:val="${o.c}"/>`:''}<w:sz w:val="${o.sz||18}"/><w:szCs w:val="${o.sz||18}"/></w:rPr><w:t xml:space="preserve">${esc(t)}</w:t></w:r>`;
-  const par=(inner,al)=>`<w:p><w:pPr><w:spacing w:before="0" w:after="0"/>${al?`<w:jc w:val="${al}"/>`:''}</w:pPr>${inner}</w:p>`;
-  const nameW=1300,sumW=700,dayW=Math.floor((15704-nameW-sumW)/n),total=nameW+sumW+dayW*n;
-  const cell=(w,inner,fill)=>`<w:tc><w:tcPr><w:tcW w:w="${w}" w:type="dxa"/>${fill?`<w:shd w:val="clear" w:color="auto" w:fill="${fill}"/>`:''}<w:vAlign w:val="center"/></w:tcPr>${par(inner,'center')}</w:tc>`;
-  const row=(cells,h)=>`<w:tr><w:trPr><w:trHeight w:val="${h}" w:hRule="atLeast"/></w:trPr>${cells}</w:tr>`;
-  const fillOf=d=>mo.closed.includes(d)?'D9D9D9':((dow(k,d)%6===0||mo.hol.includes(d))?'FFE08A':'');
-  const BLUE='1F5FBF',RED='C0342D';
-  let rows='',c;
-  if(Object.keys(mo.notes).length){
-    c=cell(nameW,'');for(let d=1;d<=n;d++)c+=cell(dayW,mo.notes[d]?run(mo.notes[d],{sz:11,c:BLUE}):'');
-    rows+=row(c+cell(sumW,''),260);
-  }
-  c=cell(nameW,run('이름',{b:1,sz:20}));
-  for(let d=1;d<=n;d++)c+=cell(dayW,run(d,{b:1,sz:18}),fillOf(d));
-  rows+=row(c+cell(sumW,run('휴무',{b:1,sz:16})),460);
-  for(const s of mo.staff){
-    let off=0;c=cell(nameW,run(s.name,{b:1,sz:18}));
+  const col=i=>{let t='';i++;while(i>0){const r=(i-1)%26;t=String.fromCharCode(65+r)+t;i=Math.floor((i-1)/26)}return t};
+  const str=(c,r,t,st2)=>`<c r="${col(c)}${r}" s="${st2}" t="inlineStr"><is><t xml:space="preserve">${esc(t)}</t></is></c>`;
+  const num=(c,r,v,st2)=>`<c r="${col(c)}${r}" s="${st2}"><v>${v}</v></c>`;
+  const last=n+1,rows=[];
+  rows.push(`<row r="1" ht="38" customHeight="1">${str(0,1,`${String(y).slice(2)}년 ${m}월 휴무계획`,1)}</row>`);
+  rows.push(`<row r="2" ht="22" customHeight="1">${str(0,2,`휴무 : ${mo.off}일`,2)}</row>`);
+  let c='';
+  for(let d=1;d<=n;d++)if(mo.notes[d])c+=str(d,3,mo.notes[d],14);
+  rows.push(`<row r="3" ht="18" customHeight="1">${c}</row>`);
+  c=str(0,4,'이름',3);
+  for(let d=1;d<=n;d++){const w=dow(k,d);c+=num(d,4,d,mo.closed.includes(d)?5:(w===0||w===6||mo.hol.includes(d))?4:3)}
+  rows.push(`<row r="4" ht="30" customHeight="1">${c}</row>`);
+  mo.staff.forEach((s,i)=>{
+    const r=5+i;let off=0;c=str(0,r,s.name,6);
     for(let d=1;d<=n;d++){
       const v=mo.cells[s.id+'|'+d]||'';if(v==='D')off++;
-      c+=cell(dayW,!v?'':v==='D'?run('D',{b:1,c:BLUE}):(v==='A'||v==='B'||v==='C')?run(v,{b:1,c:RED}):run(v,{c:BLUE,sz:v.length>2?11:14}));
+      c+=!v?`<c r="${col(d)}${r}" s="7"/>`:str(d,r,v,v==='D'?8:(v==='A'||v==='B'||v==='C')?9:isTime(v)?11:10);
     }
-    rows+=row(c+cell(sumW,run(off,{sz:18})),460);
-  }
-  const bd=['top','left','bottom','right','insideH','insideV'].map(x=>`<w:${x} w:val="single" w:sz="4" w:space="0" w:color="000000"/>`).join('');
-  const tbl=`<w:tbl><w:tblPr><w:tblW w:w="${total}" w:type="dxa"/><w:jc w:val="center"/><w:tblBorders>${bd}</w:tblBorders><w:tblLayout w:type="fixed"/><w:tblCellMar><w:left w:w="0" w:type="dxa"/><w:right w:w="0" w:type="dxa"/></w:tblCellMar></w:tblPr><w:tblGrid><w:gridCol w:w="${nameW}"/>${`<w:gridCol w:w="${dayW}"/>`.repeat(n)}<w:gridCol w:w="${sumW}"/></w:tblGrid>${rows}</w:tbl>`;
+    c+=`<c r="${col(last)}${r}" s="12"><f>COUNTIF(${col(1)}${r}:${col(n)}${r},"D")</f><v>${off}</v></c>`;
+    rows.push(`<row r="${r}" ht="30" customHeight="1">${c}</row>`);
+  });
   const lg=[`A 시차 : ${st.times.A}`,`B 시차 : ${st.times.B}`];if(st.useC)lg.push(`C 시차 : ${st.times.C}`);
-  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body>`+
-    par(run(`${String(y).slice(2)}년 ${m}월 휴무계획`,{b:1,sz:40}),'center')+par(run(`휴무 : ${mo.off}일`,{b:1,sz:20}),'center')+par('')+tbl+par('')+
-    lg.map(t=>par(run(t,{c:BLUE,sz:22}))).join('')+
-    `<w:sectPr><w:pgSz w:w="16838" w:h="11906" w:orient="landscape"/><w:pgMar w:top="850" w:right="567" w:bottom="567" w:left="567" w:header="0" w:footer="0" w:gutter="0"/></w:sectPr></w:body></w:document>`;
+  lg.forEach((t,i)=>{const r=6+mo.staff.length+i;rows.push(`<row r="${r}" ht="20" customHeight="1">${str(0,r,t,13)}</row>`)});
+  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetPr><pageSetUpPr fitToPage="1"/></sheetPr><sheetViews><sheetView showGridLines="0" workbookViewId="0"/></sheetViews><sheetFormatPr defaultRowHeight="16.5"/><cols><col min="1" max="1" width="11" customWidth="1"/><col min="2" max="${n+1}" width="5.4" customWidth="1"/><col min="${n+2}" max="${n+2}" width="5" customWidth="1"/></cols><sheetData>${rows.join('')}</sheetData><mergeCells count="2"><mergeCell ref="A1:${col(last)}1"/><mergeCell ref="A2:${col(last)}2"/></mergeCells><pageMargins left="0.3" right="0.3" top="0.5" bottom="0.5" header="0.3" footer="0.3"/><pageSetup paperSize="9" orientation="landscape" fitToWidth="1" fitToHeight="0"/></worksheet>`;
 }
-async function docxBlob(k){
-  const z=new JSZip();
-  z.file('[Content_Types].xml','<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/></Types>');
-  z.file('_rels/.rels','<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/></Relationships>');
-  z.file('word/document.xml',docxXml(k));
+const XLSX_STYLES=(()=>{
+  const f=(sz,b,color)=>`<font>${b?'<b/>':''}<sz val="${sz}"/>${color?`<color rgb="FF${color}"/>`:''}<name val="맑은 고딕"/><family val="2"/><charset val="129"/></font>`;
+  const fonts=[f(11),f(20,1),f(12,1),f(12,1,'1F5FBF'),f(12,1,'C0342D'),f(11,1,'1F5FBF'),f(10,0,'222222'),f(11,1,'C0342D'),f(11,0,'1F5FBF'),f(9,1,'1F5FBF')];
+  const fill=rgb=>`<fill><patternFill patternType="solid"><fgColor rgb="FF${rgb}"/><bgColor indexed="64"/></patternFill></fill>`;
+  const fills=['<fill><patternFill patternType="none"/></fill>','<fill><patternFill patternType="gray125"/></fill>',fill('FFE600'),fill('D9D9D9')];
+  const side=t=>`<${t} style="thin"><color rgb="FF000000"/></${t}>`;
+  const borders=['<border><left/><right/><top/><bottom/><diagonal/></border>',`<border>${side('left')}${side('right')}${side('top')}${side('bottom')}<diagonal/></border>`];
+  const xf=(font,fillId,border,al)=>`<xf numFmtId="0" fontId="${font}" fillId="${fillId}" borderId="${border}" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="${al||'center'}" vertical="center"/></xf>`;
+  const xfs=[xf(0,0,0,'general'),xf(1,0,0),xf(2,0,0),xf(2,0,1),xf(2,2,1),xf(2,3,1),xf(2,0,1),xf(0,0,1),xf(3,0,1),xf(4,0,1),xf(5,0,1),xf(6,0,1),xf(7,0,0),xf(8,0,0,'left'),xf(9,0,0)];
+  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><fonts count="${fonts.length}">${fonts.join('')}</fonts><fills count="${fills.length}">${fills.join('')}</fills><borders count="${borders.length}">${borders.join('')}</borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="${xfs.length}">${xfs.join('')}</cellXfs><cellStyles count="1"><cellStyle name="표준" xfId="0" builtinId="0"/></cellStyles></styleSheet>`;
+})();
+async function xlsxBlob(k){
+  const [y,m]=ym(k),z=new JSZip(),H='<?xml version="1.0" encoding="UTF-8" standalone="yes"?>';
+  z.file('[Content_Types].xml',H+'<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/></Types>');
+  z.file('_rels/.rels',H+'<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>');
+  z.file('xl/workbook.xml',H+`<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="${String(y).slice(2)}년 ${m}월" sheetId="1" r:id="rId1"/></sheets></workbook>`);
+  z.file('xl/_rels/workbook.xml.rels',H+'<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>');
+  z.file('xl/styles.xml',XLSX_STYLES);
+  z.file('xl/worksheets/sheet1.xml',xlsxSheet(k));
   return z.generateAsync({type:typeof Blob==='undefined'?'nodebuffer':'blob',compression:'DEFLATE'});
 }
 async function saveDoc(){
   const say=t=>{$('saveMsg').textContent=t};
-  const [y,m]=ym(S.cur),filename=`${String(y).slice(2)}년 ${m}월 휴무계획.docx`;
+  const [y,m]=ym(S.cur),filename=`${String(y).slice(2)}년 ${m}월 휴무계획.xlsx`;
   say('파일을 만드는 중입니다.');
   let blob;
-  try{blob=await docxBlob(S.cur)}catch(e){return say('파일을 만들지 못했습니다. 새로고침한 뒤 다시 눌러 주세요.')}
+  try{blob=await xlsxBlob(S.cur)}catch(e){return say('파일을 만들지 못했습니다. 새로고침한 뒤 다시 눌러 주세요.')}
   let dl=null;
   try{if(window.claude&&window.claude.use)dl=await window.claude.use('downloads')}catch(e){}
   if(dl){
-    try{await dl.save({filename,data:blob});say('저장했습니다. 한글에서 이 파일을 열면 됩니다.')}
+    try{await dl.save({filename,data:blob});say('저장했습니다. 엑셀에서 열면 됩니다.')}
     catch(e){say(e&&e.code==='declined'?'저장을 취소했습니다.':'이 화면에서는 저장할 수 없습니다.')}
     return;
   }
   try{
     const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=filename;
     document.body.appendChild(a);a.click();a.remove();
-    say('저장을 시작했습니다. 파일이 안 보이면 Claude 앱에서 이 페이지를 다시 열어 주세요.');
+    say('저장했습니다. 내려받기(다운로드) 폴더를 확인해 주세요.');
   }catch(e){say('이 화면에서는 저장할 수 없습니다.')}
 }
 async function api(path,body){
