@@ -187,6 +187,7 @@ body.gate main>*:not(#gate){display:none}
 .btn.apply{background:var(--blue);color:var(--blue-ink);border-color:var(--blue);font-weight:700;font-size:19px;min-height:54px;padding:0 34px;letter-spacing:.04em}
 .pubbar.dirty{background:var(--blue-bg);border-color:var(--blue);border-width:2px}
 #adminCode{width:150px}
+#pasteBox{width:100%;font:inherit;font-size:14px;color:inherit;background:var(--surface);border:1px solid var(--line);padding:8px;white-space:pre;overflow:auto}
 .installbox{display:flex;align-items:flex-start;gap:14px;background:var(--surface)}
 .installbox img{flex:none;border:1px solid var(--line)}
 main{padding-bottom:170px}
@@ -289,6 +290,11 @@ body.m.view .savebox{display:none}
     <ul class="list" id="issues"></ul>
   </section>
 
+  <details class="fold"><summary>엑셀에서 붙여넣기</summary><div class="rows">
+    <span class="muted">엑셀에서 이름 칸부터 마지막 날짜 칸까지 끌어서 복사한 뒤, 아래 칸에 붙여 넣고 "표에 넣기"를 누르세요. 지금 보고 있는 달의 표가 붙여 넣은 내용으로 바뀝니다. 이름이 같은 직원 줄에 들어가고, 없는 이름은 새 직원으로 추가됩니다.</span>
+    <textarea id="pasteBox" rows="6" aria-label="엑셀에서 복사한 내용" placeholder="여기에 붙여 넣으세요"></textarea>
+    <div class="row"><button class="btn primary" id="pasteApply">표에 넣기</button><span class="now" id="pasteMsg"></span></div>
+  </div></details>
   <details class="fold"><summary>이 달 설정: 휴점일, 날짜별 필요 인원</summary><div class="rows" id="monthset"></div></details>
   <details class="fold"><summary>직원 추가·삭제</summary><div class="rows" id="staff"></div><p class="muted">직원 변경은 이 달과 앞으로 새로 만드는 달에 적용됩니다. 지난달 표는 그대로 남습니다.</p></details>
   <details class="fold"><summary>규칙</summary><div class="rows" id="rules"></div></details>
@@ -883,6 +889,30 @@ async function boot(){
   if(!code){gate=true;return render()}
   render();await pull();
 }
+function importPaste(text){
+  const m=mo(),n=nDays(S.cur),norm=x=>String(x||'').replace(/\s+/g,'');
+  const lines=String(text||'').replace(/\r/g,'').split('\n').filter(l=>l.trim()!=='');
+  if(!lines.length)return '붙여 넣은 내용이 없습니다.';
+  const sep=text.includes('\t')?'\t':',';
+  const fix=x=>{x=String(x||'').trim();const t=x.match(/^(\d{1,2}:\d{2})(:\d{2})?$/);if(t)return t[1];return /^[dabc]$/i.test(x)?x.toUpperCase():x};
+  const isVal=x=>x===''||/^[DABC]$/.test(x)||isTime(x);
+  let rows=lines.map(l=>l.split(sep).map(fix));
+  rows=rows.filter(r=>!(norm(r[0])==='이름'||(r[1]==='1'&&r[2]==='2'&&r[3]==='3')||(r[0]==='1'&&r[1]==='2'&&r[2]==='3')));
+  if(!rows.length)return '넣을 직원 줄을 찾지 못했습니다.';
+  if(!m.wish)m.wish={};if(!m.gen)m.gen={};
+  let done=0;const added=[];
+  rows.forEach((r,ri)=>{
+    let st=m.staff.find(s=>norm(s.name)===norm(r[0])&&norm(r[0])!==''),vals=r;
+    if(st)vals=r.slice(1);
+    else if(r.length>n&&!isVal(r[0])){vals=r.slice(1);st={id:'s'+Date.now().toString(36)+ri,name:norm(r[0]),manual:false};m.staff.push(st);added.push(st.name)}
+    else st=m.staff[ri];
+    if(!st)return;
+    for(let d=1;d<=n;d++){const key=st.id+'|'+d,v=(vals[d-1]||'').slice(0,5);delete m.wish[key];delete m.gen[key];if(v)m.cells[key]=v;else delete m.cells[key]}
+    if(vals.slice(0,n).some(isTime))st.manual=true;
+    done++;
+  });
+  return done?`${done}명의 표를 넣었습니다.`+(added.length?` 새로 추가한 직원: ${added.join(', ')}.`:'')+' 확인한 뒤 "적용하기"를 누르세요.':'넣을 직원 줄을 찾지 못했습니다.';
+}
 function dayIn(id){const v=Math.round(Number($(id).value));return v>=1&&v<=nDays(S.cur)?v:0}
 
 document.addEventListener('click',e=>{
@@ -907,6 +937,7 @@ document.addEventListener('click',e=>{
   if((!canEdit()||isMobile()&&mMode==='view')&&('c' in d||'d' in d)){mDay=Number('c' in d?d.c.split('|')[1]:d.d);return render()}
   if('b' in d){brush=d.b;return render()}
   if(t.id==='saveDoc'){saveDoc();return}
+  if(t.id==='pasteApply'){const msg=importPaste($('pasteBox').value);commit();$('pasteMsg').textContent=msg;return}
   if(t.id==='recommend'){recommend();return commit()}
   if(t.id==='clearRec'){clearRec(m);recMsg='추천으로 채운 칸을 지웠습니다.';return commit()}
   if('c' in d){
