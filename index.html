@@ -4,6 +4,14 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>매장 휴무계획표</title>
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#f3f2f0">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="휴무계획표">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700&family=Noto+Serif+KR:wght@500;700&display=swap" rel="stylesheet">
 <style>
 :root{
@@ -12,6 +20,7 @@
   --accent:#15161a; --accent-ink:#ffffff;
   --off:#2c4a7c; --off-bg:#e8edf6; --shift:#8a2c38; --label:#57504a;
   --holiday:#eee4cd; --holiday-ink:#15161a; --closed:#d9d9d9;
+  --blue:#1657d9; --blue-ink:#ffffff; --blue-bg:#e8f0ff;
   --bad:#a3231c; --bad-bg:#f9e7e5; --warn:#765000; --warn-bg:#f8eed2; --ok:#1c633a; --ok-bg:#e4f1e8;
   --display:"Noto Serif KR","Nanum Myeongjo",serif;
   --font:"Noto Sans KR","Apple SD Gothic Neo","Malgun Gothic",sans-serif;
@@ -23,7 +32,7 @@
     --accent:#eceae6; --accent-ink:#111113;
     --off:#a8bfee; --off-bg:#212b40; --shift:#e8a0a9; --label:#cbc1b4;
     --holiday:#4b4230; --holiday-ink:#f2ead8; --closed:#2e2f33;
-    --bad:#f0958d; --bad-bg:#3b1e1b; --warn:#e4c16e; --warn-bg:#382e13; --ok:#84cf9f; --ok-bg:#183122;
+    --blue:#7fa8ff; --blue-ink:#0b1730; --blue-bg:#18233d; --bad:#f0958d; --bad-bg:#3b1e1b; --warn:#e4c16e; --warn-bg:#382e13; --ok:#84cf9f; --ok-bg:#183122;
   }
 }
 :root[data-theme="dark"]{
@@ -32,7 +41,7 @@
   --accent:#eceae6; --accent-ink:#111113;
   --off:#a8bfee; --off-bg:#212b40; --shift:#e8a0a9; --label:#cbc1b4;
   --holiday:#4b4230; --holiday-ink:#f2ead8; --closed:#2e2f33;
-  --bad:#f0958d; --bad-bg:#3b1e1b; --warn:#e4c16e; --warn-bg:#382e13; --ok:#84cf9f; --ok-bg:#183122;
+  --blue:#7fa8ff; --blue-ink:#0b1730; --blue-bg:#18233d; --bad:#f0958d; --bad-bg:#3b1e1b; --warn:#e4c16e; --warn-bg:#382e13; --ok:#84cf9f; --ok-bg:#183122;
 }
 *{box-sizing:border-box}
 [hidden]{display:none!important}
@@ -165,9 +174,19 @@ body.ro #s1,body.ro #s2,body.ro #s4,body.ro details.fold,body.ro .sub,body.ro #s
 body.gate main>*:not(#gate){display:none}
 #gateCode{width:140px;font-size:26px;letter-spacing:.3em;text-align:center;min-height:56px}
 .pubbar{position:sticky;top:0;z-index:4;background:var(--surface);border:1px solid var(--ink);padding:12px 16px;display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px 16px;font-weight:700}
+.btn.apply{background:var(--blue);color:var(--blue-ink);border-color:var(--blue);font-weight:700;font-size:19px;min-height:54px;padding:0 34px;letter-spacing:.04em}
+.pubbar.dirty{background:var(--blue-bg);border-color:var(--blue);border-width:2px}
 #adminCode{width:150px}
+.installbox{display:flex;align-items:flex-start;gap:14px;background:var(--surface)}
+.installbox img{flex:none;border:1px solid var(--line)}
 main{padding-bottom:110px}
-#chatOpen{position:fixed;right:16px;bottom:16px;z-index:5;min-height:54px;padding:0 22px;font-size:17px;box-shadow:0 4px 14px rgba(0,0,0,.25)}
+#chatOpen{position:fixed;right:16px;bottom:16px;z-index:5;min-height:58px;padding:0 22px 0 6px;font-size:17px;box-shadow:0 4px 14px rgba(0,0,0,.25);display:flex;align-items:center;gap:8px}
+#chatOpen img{width:68px;height:68px;margin-top:-22px;object-fit:contain;pointer-events:none;filter:drop-shadow(0 2px 3px rgba(0,0,0,.25))}
+.chathead strong{display:flex;align-items:center;gap:8px}
+.chathead img{width:40px;height:40px;object-fit:contain}
+.hello{display:flex;align-items:flex-end;gap:6px}
+.hello img{width:84px;height:auto;flex:none}
+.hello .msg{max-width:none}
 #chatBox{position:fixed;right:16px;bottom:16px;z-index:6;width:min(390px,calc(100vw - 32px));height:min(560px,calc(100% - 32px));display:flex;flex-direction:column;background:var(--surface);border:1px solid var(--ink);box-shadow:0 8px 28px rgba(0,0,0,.3)}
 .chathead{display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-bottom:1px solid var(--ink);font-family:var(--display);font-size:18px}
 #chatLog{flex:1;overflow-y:auto;padding:14px;display:flex;flex-direction:column;gap:10px;background:var(--bg)}
@@ -214,7 +233,7 @@ body.m.view .savebox{display:none}
   <div class="card" id="netmsg" hidden></div>
   <div class="pubbar" id="pubbar" hidden>
     <span id="pubState"></span>
-    <div class="row"><button class="btn primary" id="publish">직원들에게 게시</button><button class="btn small" id="adminOut">관리자 나가기</button></div>
+    <div class="row"><button class="btn apply" id="publish">적용하기</button><button class="btn small" id="adminOut">관리자 나가기</button></div>
   </div>
 
   <div id="mbar" hidden></div>
@@ -258,6 +277,10 @@ body.m.view .savebox{display:none}
   <details class="fold"><summary>규칙</summary><div class="rows" id="rules"></div></details>
 
   <p class="muted" id="saveinfo"></p>
+  <div class="card installbox" id="installBox" hidden>
+    <img src="icon-192.png" alt="" width="56" height="56">
+    <div class="rows"><strong>앱처럼 쓰기</strong><span class="muted" id="installText"></span><div class="row"><button class="btn primary" id="installBtn" hidden>앱 설치</button><button class="btn small" id="installHide">다시 보지 않기</button></div></div>
+  </div>
   <div class="row" id="adminRow" hidden>
     <button class="btn small" id="adminOpen">관리자</button>
     <span class="row" id="adminForm" hidden><input type="password" inputmode="numeric" id="adminCode" maxlength="12" autocomplete="off" placeholder="관리자 번호" aria-label="관리자 번호"><button class="btn small primary" id="adminOk">확인</button></span>
@@ -265,9 +288,9 @@ body.m.view .savebox{display:none}
   </div>
 </main>
 
-<button class="btn primary" id="chatOpen" hidden>도우미에게 물어보기</button>
+<button class="btn primary" id="chatOpen" hidden><img src="helper-face.png" alt="" width="68" height="68"><span>도우미에게 물어보기</span></button>
 <section id="chatBox" hidden aria-label="도우미">
-  <div class="chathead"><strong>도우미</strong><button class="btn small" id="chatClose">닫기</button></div>
+  <div class="chathead"><strong><img src="helper-face.png" alt="" width="40" height="40">도우미</strong><button class="btn small" id="chatClose">닫기</button></div>
   <div id="chatLog" aria-live="polite"></div>
   <div class="chatin"><input type="text" id="chatIn" maxlength="300" placeholder="궁금한 것을 적어 주세요" aria-label="도우미에게 물어볼 내용"><button class="btn primary" id="chatSend">보내기</button></div>
 </section>
@@ -370,6 +393,7 @@ function check(k){
   return r;
 }
 
+let installEvt=null;
 let pickMin=null,openCal=null,lastPer=0,lastMobile=false,mMode='view',mWho=null,mDay=null;
 function isMobile(){return typeof window!=='undefined'&&(window.innerWidth||1100)<700}
 function calHtml(k,mo,r,id){
@@ -420,8 +444,13 @@ function render(){
   if(document.body)document.body.className=[M?'m '+mMode:'',ro?'ro':'',gate?'gate':''].join(' ').trim();
   $('gate').hidden=!gate;$('gateMsg').textContent=gateMsg;
   $('netmsg').hidden=!netMsg;$('netmsg').textContent=netMsg;
-  $('pubbar').hidden=!(API&&admin)||gate;
-  $('pubState').textContent=(S.dirty?'게시하지 않은 변경이 있습니다. "직원들에게 게시"를 눌러야 직원 화면에 나옵니다.':'관리자 모드입니다.')+(pubMsg?' '+pubMsg:'');
+  $('pubbar').hidden=!(API&&admin)||gate;$('pubbar').className='pubbar'+(S.dirty?' dirty':'');
+  $('pubState').textContent=(S.dirty?'아직 적용하지 않은 변경이 있습니다. "적용하기"를 눌러야 직원 화면에 나옵니다.':'관리자 모드입니다.')+(pubMsg?' '+pubMsg:'');
+  const standalone=typeof window!=='undefined'&&((window.matchMedia&&window.matchMedia('(display-mode: standalone)').matches)||window.navigator.standalone===true);
+  const ua=typeof navigator!=='undefined'?navigator.userAgent:'',ios=/iPhone|iPad|iPod/.test(ua);
+  const showInstall=!gate&&!standalone&&!LS.get('hyumu-noinstall')&&(!!installEvt||ios);
+  $('installBox').hidden=!showInstall;$('installBtn').hidden=!installEvt;
+  $('installText').textContent=installEvt?'"앱 설치"를 누르면 휴대폰 홈 화면에 아이콘이 생기고, 앱처럼 열립니다.':'아이폰: 사파리 아래쪽의 공유 버튼(네모에 화살표)을 누른 뒤 "홈 화면에 추가"를 누르면 홈 화면에 아이콘이 생깁니다.';
   $('adminRow').hidden=!API||!!admin||gate;$('adminForm').hidden=!adminAsk;$('adminMsg').textContent=adminMsg;
   if(mWho===null)mWho=S.mWho||null;
   if(mWho!=='all'&&!mo.staff.some(s=>s.id===mWho))mWho=mo.staff[0]?mo.staff[0].id:'all';
@@ -745,7 +774,7 @@ async function pull(){
   try{
     const j=await api('/load',{});
     netMsg='';
-    if(!(admin&&S.dirty)&&!applyServer(j.data)&&!admin)netMsg='아직 게시된 근무표가 없습니다.';
+    if(!(admin&&S.dirty)&&!applyServer(j.data)&&!admin)netMsg='아직 올라온 근무표가 없습니다.';
   }catch(e){
     if(e.code==='wrong_code'){code='';admin='';LS.set('hyumu-code','');LS.set('hyumu-admin','');gate=true}
     else netMsg=e.code==='locked'?'코드를 여러 번 틀려 잠시 막혔습니다. 한 시간 뒤에 다시 열어 주세요.':'서버에 연결하지 못했습니다. 이 기기에 남아 있는 표를 보여 드립니다.';
@@ -759,7 +788,7 @@ async function enterCode(){
   try{
     const j=await api('/load',{});
     LS.set('hyumu-code',code);gate=false;gateMsg='';
-    if(!applyServer(j.data))netMsg='아직 게시된 근무표가 없습니다.';
+    if(!applyServer(j.data))netMsg='아직 올라온 근무표가 없습니다.';
   }catch(e){
     code='';
     gateMsg=e.code==='wrong_code'?'코드가 맞지 않습니다. 다시 확인해 주세요.':e.code==='locked'?'여러 번 틀려 잠시 막혔습니다. 한 시간 뒤에 다시 해 주세요.':'서버에 연결하지 못했습니다. 잠시 뒤 다시 해 주세요.';
@@ -774,13 +803,13 @@ async function tryAdmin(){
   render();
 }
 async function publish(){
-  pubMsg='게시하는 중입니다.';render();
+  pubMsg='적용하는 중입니다.';render();
   try{
     const data=JSON.parse(JSON.stringify(S));delete data.dirty;delete data.mWho;
     await api('/save',{data});
     S.dirty=false;save();
-    const n=new Date();pubMsg=`게시했습니다. (${n.getHours()}시 ${String(n.getMinutes()).padStart(2,'0')}분)`;
-  }catch(e){pubMsg=e.code==='wrong_code'?'관리자 번호가 바뀌었습니다. "관리자 나가기"를 누른 뒤 다시 들어와 주세요.':'게시하지 못했습니다. 잠시 뒤 다시 눌러 주세요.'}
+    const n=new Date();pubMsg=`적용했습니다. (${n.getHours()}시 ${String(n.getMinutes()).padStart(2,'0')}분)`;
+  }catch(e){pubMsg=e.code==='wrong_code'?'관리자 번호가 바뀌었습니다. "관리자 나가기"를 누른 뒤 다시 들어와 주세요.':'적용하지 못했습니다. 잠시 뒤 다시 눌러 주세요.'}
   render();
 }
 function chatCtx(){
@@ -807,7 +836,7 @@ function renderChat(){
   $('chatOpen').hidden=!on||chatOpen;$('chatBox').hidden=!on||!chatOpen;
   if(!on||!chatOpen)return;
   const qs=['근무표는 어떻게 짜요?','빨간 글이 떴어요. 어떻게 고쳐요?','희망 휴무는 어떻게 넣어요?'];
-  $('chatLog').innerHTML=`<div class="msg a">안녕하세요. 휴무계획표 도우미입니다.<br>쓰는 방법이 헷갈리거나 표에 빨간 글이 뜰 때 물어보세요.<br>저는 AI라서 틀릴 수도 있습니다.</div>`+
+  $('chatLog').innerHTML=`<div class="hello"><img src="helper.png" alt="" width="84"><div class="msg a">안녕하세요. 휴무계획표 도우미입니다.<br>쓰는 방법이 헷갈리거나 표에 빨간 글이 뜰 때 물어보세요.<br>저는 AI라서 틀릴 수도 있습니다.</div></div>`+
     (chat.length?'':`<div class="qs">${qs.map(q=>`<button class="btn small" data-q="${q}">${q}</button>`).join('')}</div>`)+
     chat.map(c=>`<div class="msg ${c.role==='user'?'u':'a'}">${esc(c.content).replace(/\n/g,'<br>')}</div>`).join('')+
     (chatBusy?'<div class="msg a">답을 쓰는 중입니다.</div>':'');
@@ -824,6 +853,8 @@ function dayIn(id){const v=Math.round(Number($(id).value));return v>=1&&v<=nDays
 document.addEventListener('click',e=>{
   const t=e.target.closest('button');if(!t)return;
   const m=mo(),d=t.dataset;
+  if(t.id==='installBtn'){if(installEvt){const ev=installEvt;installEvt=null;ev.prompt();if(ev.userChoice)ev.userChoice.then(()=>render(),()=>render())}return render()}
+  if(t.id==='installHide'){LS.set('hyumu-noinstall','1');return render()}
   if(t.id==='gateOk')return enterCode();
   if(t.id==='adminOpen'){adminAsk=!adminAsk;adminMsg='';return render()}
   if(t.id==='adminOk')return tryAdmin();
@@ -916,6 +947,9 @@ document.addEventListener('change',e=>{
 
 boot();
 if(typeof window!=='undefined'){
+  window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();installEvt=e;render()});
+  window.addEventListener('appinstalled',()=>{installEvt=null;render()});
+  if('serviceWorker' in navigator&&(location.protocol==='https:'||location.hostname==='localhost'))navigator.serviceWorker.register('sw.js').catch(()=>{});
   document.addEventListener('keydown',e=>{if(e.key!=='Enter'||e.isComposing)return;const b={gateCode:'gateOk',adminCode:'adminOk',chatIn:'chatSend'}[e.target.id];if(b){e.preventDefault();$(b).click()}});
   window.addEventListener('resize',()=>{if(isMobile()!==lastMobile||gridPer(nDays(S.cur)).per!==lastPer)render()});
   window.addEventListener('load',()=>{if(gridPer(nDays(S.cur)).per!==lastPer)render()});
