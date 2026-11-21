@@ -190,7 +190,8 @@ body.gate main>*:not(#gate){display:none}
 #pasteBox{width:100%;font:inherit;font-size:14px;color:inherit;background:var(--surface);border:1px solid var(--line);padding:8px;white-space:pre;overflow:auto}
 .installbox{display:flex;align-items:flex-start;gap:14px;background:var(--surface)}
 .installbox img{flex:none;border:1px solid var(--line)}
-main{padding-bottom:170px}
+main{padding-bottom:210px}
+#chatOpen.mini .bubble{display:none}
 #chatOpen{position:fixed;right:10px;bottom:8px;z-index:5;display:flex;align-items:flex-end;gap:2px;background:none;border:0;padding:0;font:inherit;color:var(--ink)}
 #chatOpen img{width:96px;height:auto;pointer-events:none;filter:drop-shadow(0 3px 5px rgba(0,0,0,.28))}
 .bubble{position:relative;background:var(--surface);border:1.5px solid var(--ink);border-radius:18px;padding:10px 16px;font-weight:700;font-size:16px;line-height:1.4;margin-bottom:62px;text-align:left;box-shadow:0 3px 10px rgba(0,0,0,.18)}
@@ -216,7 +217,8 @@ body.m .savebox{order:5}
 body.m.view .savebox{display:none}
 @media (max-width:1000px){.savebox{position:static;align-items:center;text-align:center}}
 @media (max-width:560px){
-  #chatOpen img{width:78px} .bubble{font-size:14px;padding:8px 12px;margin-bottom:50px}
+  #chatOpen{right:6px;bottom:6px} #chatOpen img{width:62px} .bubble{font-size:14px;padding:8px 12px;margin-bottom:40px}
+  #adminRow{padding-right:76px;min-height:70px} .installbox{margin-right:0}
   h1{font-size:25px;order:-1;width:100%} .step{padding:16px 12px} main{padding:20px 16px 48px}
   .blk .name{font-size:13px} td.c button{font-size:15px} td.c.L button{font-size:10px}
   .btn.big{width:100%}
@@ -1014,6 +1016,10 @@ document.addEventListener('change',e=>{
 
 boot();
 if(typeof window!=='undefined'){
+  // 휴대폰에서는 말풍선이 아래쪽 버튼을 가리지 않도록, 잠시 보여 준 뒤 고양이만 남깁니다.
+  const shrink=()=>{if(isMobile())$('chatOpen').classList.add('mini')};
+  setTimeout(shrink,6000);
+  window.addEventListener('scroll',shrink,{passive:true,once:true});
   window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();installEvt=e;render()});
   window.addEventListener('appinstalled',()=>{installEvt=null;render()});
   if('serviceWorker' in navigator&&(location.protocol==='https:'||location.hostname==='localhost'))navigator.serviceWorker.register('sw.js').catch(()=>{});
