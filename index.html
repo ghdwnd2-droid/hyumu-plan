@@ -179,9 +179,13 @@ body.gate main>*:not(#gate){display:none}
 #adminCode{width:150px}
 .installbox{display:flex;align-items:flex-start;gap:14px;background:var(--surface)}
 .installbox img{flex:none;border:1px solid var(--line)}
-main{padding-bottom:110px}
-#chatOpen{position:fixed;right:16px;bottom:16px;z-index:5;min-height:58px;padding:0 22px 0 6px;font-size:17px;box-shadow:0 4px 14px rgba(0,0,0,.25);display:flex;align-items:center;gap:8px}
-#chatOpen img{width:68px;height:68px;margin-top:-22px;object-fit:contain;pointer-events:none;filter:drop-shadow(0 2px 3px rgba(0,0,0,.25))}
+main{padding-bottom:170px}
+#chatOpen{position:fixed;right:10px;bottom:8px;z-index:5;display:flex;align-items:flex-end;gap:2px;background:none;border:0;padding:0;font:inherit;color:var(--ink)}
+#chatOpen img{width:96px;height:auto;pointer-events:none;filter:drop-shadow(0 3px 5px rgba(0,0,0,.28))}
+.bubble{position:relative;background:var(--surface);border:1.5px solid var(--ink);border-radius:18px;padding:10px 16px;font-weight:700;font-size:16px;line-height:1.4;margin-bottom:62px;text-align:left;box-shadow:0 3px 10px rgba(0,0,0,.18)}
+.bubble::after{content:"";position:absolute;right:-8px;bottom:14px;width:13px;height:13px;background:var(--surface);border-right:1.5px solid var(--ink);border-bottom:1.5px solid var(--ink);transform:rotate(-45deg)}
+#chatOpen:hover .bubble,#chatOpen:focus-visible .bubble{background:var(--accent);color:var(--accent-ink)}
+#chatOpen:hover .bubble::after,#chatOpen:focus-visible .bubble::after{background:var(--accent)}
 .chathead strong{display:flex;align-items:center;gap:8px}
 .chathead img{width:40px;height:40px;object-fit:contain}
 .hello{display:flex;align-items:flex-end;gap:6px}
@@ -201,6 +205,7 @@ body.m .savebox{order:5}
 body.m.view .savebox{display:none}
 @media (max-width:1000px){.savebox{position:static;align-items:center;text-align:center}}
 @media (max-width:560px){
+  #chatOpen img{width:78px} .bubble{font-size:14px;padding:8px 12px;margin-bottom:50px}
   h1{font-size:25px;order:-1;width:100%} .step{padding:16px 12px} main{padding:20px 16px 48px}
   .blk .name{font-size:13px} td.c button{font-size:15px} td.c.L button{font-size:10px}
   .btn.big{width:100%}
@@ -288,7 +293,7 @@ body.m.view .savebox{display:none}
   </div>
 </main>
 
-<button class="btn primary" id="chatOpen" hidden><img src="helper-face.png" alt="" width="68" height="68"><span>도우미에게 물어보기</span></button>
+<button id="chatOpen" hidden aria-label="도우미에게 물어보기"><span class="bubble">궁금한 건<br>저에게 물어보세요</span><img src="helper.png" alt="" width="96"></button>
 <section id="chatBox" hidden aria-label="도우미">
   <div class="chathead"><strong><img src="helper-face.png" alt="" width="40" height="40">도우미</strong><button class="btn small" id="chatClose">닫기</button></div>
   <div id="chatLog" aria-live="polite"></div>
