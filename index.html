@@ -282,7 +282,7 @@ const FIXED_HOL=['01-01','03-01','05-05','06-06','08-15','10-03','10-09','12-25'
 const DOW=['일','월','화','수','목','금','토'];
 // Cloudflare 서버 주소를 아래 따옴표 안에 넣습니다. 예: 'https://hyumu.내이름.workers.dev'
 // 비워 두면 서버 없이, 이 기기에만 저장하는 방식으로 동작합니다.
-const API_URL='';
+const API_URL='https://hyumu-plan.ghdwnd2.workers.dev';
 const API=((typeof window!=='undefined'&&window.HYUMU_API)||API_URL).replace(/\/$/,'');
 const LS={get(k){try{return localStorage.getItem(k)||''}catch(e){return ''}},set(k,v){try{if(v)localStorage.setItem(k,v);else localStorage.removeItem(k)}catch(e){}}};
 let code=LS.get('hyumu-code'),admin=LS.get('hyumu-admin'),gate=false,gateMsg='',adminAsk=false,adminMsg='',netMsg='',pubMsg='',chat=[],chatOpen=false,chatBusy=false;
