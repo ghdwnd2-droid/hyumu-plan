@@ -168,7 +168,16 @@ table.mini{max-width:300px}
 .mini td button em{font-style:normal;font-size:9px;color:var(--off)}
 .mini td button[aria-pressed=true]{background:var(--accent);color:var(--accent-ink)}
 .mini td button[aria-pressed=true] em{color:var(--accent-ink)}
-#mday{display:flex;flex-direction:column;gap:6px}
+#mday{position:fixed;left:0;right:0;bottom:0;z-index:7;max-height:62%;overflow-y:auto;display:flex;flex-direction:column;gap:12px;background:var(--surface);border:0;border-top:2px solid var(--ink);padding:16px 16px 22px;box-shadow:0 -8px 24px rgba(0,0,0,.22)}
+.dhead{display:flex;align-items:center;justify-content:space-between;gap:10px;font-family:var(--display);font-size:19px}
+.dgrp{display:flex;flex-direction:column;gap:6px}
+.dgrp>b{font-size:15px;color:var(--muted)}
+.dnames{display:flex;flex-wrap:wrap;gap:6px}
+.dnames .dn{font-family:var(--font);font-size:16px;font-weight:700;color:var(--ink);border:1px solid var(--line);padding:6px 12px}
+.dnames .dn.on{border-color:var(--ink)}
+.dnames .dn.offn{background:var(--off-bg);color:var(--off);border-color:var(--off-bg)}
+.dnames .dn i{font-style:normal;font-weight:500;font-size:13px;color:var(--shift);margin-left:6px}
+@media (min-width:700px){#mday{left:auto;right:16px;bottom:16px;width:420px;border:1px solid var(--ink)}}
 #mday .row{align-items:baseline}
 body.m.view #s1,body.m.view #s2,body.m.view #s4,body.m.view details.fold:not(.guide),body.m.view .sub,body.m.view #s3>h2,body.m.view #s3>.help,body.m.view #daypanel,body.m.view #saveinfo{display:none}
 body.ro #s1,body.ro #s2,body.ro #s4,body.ro details.fold,body.ro .sub,body.ro #s3>h2,body.ro #s3>.help,body.ro #daypanel{display:none}
@@ -429,14 +438,22 @@ function calHtml(k,mo,r,id){
   return h+`<p class="calsum">${parts.join(' · ')||'아직 넣은 일정이 없습니다.'}</p>`;
 }
 function dayHtml(k,mo,d){
-  const m=ym(k)[1],g={};
-  mo.staff.forEach(s=>{const v=mo.cells[s.id+'|'+d]||'';(g[v]=g[v]||[]).push(s.name)});
-  const line=(t,a)=>a&&a.length?`<div class="row"><strong>${esc(t)}</strong><span>${a.map(esc).join(', ')}</span></div>`:'';
-  let h=`<strong>${m}월 ${d}일 (${DOW[dow(k,d)]})${mo.closed.includes(d)?' · 휴점일':''}${mo.notes[d]?' · '+esc(mo.notes[d]):''}</strong>`;
-  h+=line('휴무',g.D)+line('A 시차',g.A)+line('B 시차',g.B)+line('C 시차',g.C);
-  Object.keys(g).filter(x=>!['','D','A','B','C'].includes(x)).forEach(x=>{h+=line(x,g[x])});
-  return h+line('정상 근무',g['']);
+  const m=ym(k)[1],work=[],off=[],etc={};
+  mo.staff.forEach(s=>{
+    const v=mo.cells[s.id+'|'+d]||'';
+    if(isWork(v))work.push({n:s.name,t:v===''?'':isTime(v)?v:v+' 시차'});
+    else if(v==='D')off.push(s.name);
+    else (etc[v]=etc[v]||[]).push(s.name);
+  });
+  const closed=mo.closed.includes(d);
+  let h=`<div class="dhead"><strong>${m}월 ${d}일 (${DOW[dow(k,d)]})${mo.notes[d]?' · '+esc(mo.notes[d]):''}</strong><button class="btn small" id="mdayClose">닫기</button></div>`;
+  if(closed)h+='<p class="now">휴점일입니다.</p>';
+  h+=`<div class="dgrp"><b>출근 ${work.length}명</b><div class="dnames">${work.map(w=>`<span class="dn on">${esc(w.n)}${w.t?`<i>${esc(w.t)}</i>`:''}</span>`).join('')||'<span class="muted">없음</span>'}</div></div>`;
+  h+=`<div class="dgrp"><b>휴무 ${off.length}명</b><div class="dnames">${off.map(x=>`<span class="dn offn">${esc(x)}</span>`).join('')||'<span class="muted">없음</span>'}</div></div>`;
+  Object.keys(etc).forEach(x=>{h+=`<div class="dgrp"><b>${esc(x)}</b><div class="dnames">${etc[x].map(y=>`<span class="dn">${esc(y)}</span>`).join('')}</div></div>`});
+  return h;
 }
+
 function gridPer(n){
   const W=$('gridwrap').clientWidth||1100,small=W<560;
   const nameW=small?58:84,cell=small?31:33;
@@ -873,6 +890,7 @@ document.addEventListener('click',e=>{
   const m=mo(),d=t.dataset;
   if(t.id==='installBtn'){if(installEvt){const ev=installEvt;installEvt=null;ev.prompt();if(ev.userChoice)ev.userChoice.then(()=>render(),()=>render())}return render()}
   if(t.id==='installHide'){LS.set('hyumu-noinstall','1');return render()}
+  if(t.id==='mdayClose'){mDay=null;return render()}
   if(t.id==='gateOk')return enterCode();
   if(t.id==='adminOpen'){adminAsk=!adminAsk;adminMsg='';return render()}
   if(t.id==='adminOk')return tryAdmin();
