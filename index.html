@@ -326,7 +326,7 @@ body.m.view .savebox{display:none}
 const KEY='hyumu-plan-v1';
 const LABELS=['연차','검진','교육','노조','병가','회의','근속','안전','감정'];
 const REST=new Set(['D','연차','병가','근속','감정']);
-const OFFLIKE=new Set(['감정','근속']);          // 휴무와 같은 색으로 보여 줄 값      // 쉬는 날로 보는 값
+const OFFLIKE=new Set(['감정','근속','연차','병가']);          // 휴무와 같은 색으로 보여 줄 값      // 쉬는 날로 보는 값
 const WORK=new Set(['','A','B','C']);
 const isTime=v=>/^\d{1,2}:\d{2}$/.test(v);
 const isWork=v=>WORK.has(v)||isTime(v);   // 시각(예: 12:00)이 적힌 칸도 출근                 // 출근으로 보는 값
@@ -559,7 +559,7 @@ function render(){
   $('mday').innerHTML=showDay?dayHtml(k,mo,mDay):'';
 
   $('legend').innerHTML=`<span>A 시차 : ${esc(st.times.A)}</span><span>B 시차 : ${esc(st.times.B)}</span>`+
-    (st.useC?`<span>C 시차 : ${esc(st.times.C)}</span>`:'')+`<span>D·근속·감정 : 휴무</span><span>D● : 직원이 희망한 휴무</span><span>빈칸 : 정상 근무</span>`;
+    (st.useC?`<span>C 시차 : ${esc(st.times.C)}</span>`:'')+`<span>D·근속·감정·연차·병가 : 쉬는 날</span><span>D● : 직원이 희망한 휴무</span><span>빈칸 : 정상 근무</span>`;
 
   const dp=$('daypanel');
   if(selDay&&selDay<=n){
