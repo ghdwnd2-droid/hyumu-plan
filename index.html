@@ -330,9 +330,9 @@ body.m.view .savebox{display:none}
   </div>
 </main>
 
-<button id="chatOpen" hidden aria-label="초롱이와 몽이에게 물어보기"><span class="bubble">궁금한 건<br>초롱이·몽이에게 물어보세요</span><img src="helper.png" alt="" width="124"></button>
-<section id="chatBox" hidden aria-label="도우미 초롱이와 몽이">
-  <div class="chathead"><strong><img src="chorong-face.png" alt="" width="38" height="38"><img src="mong-face.png" alt="" width="38" height="38">초롱이 · 몽이</strong><span class="row"><button class="btn small" id="chatXlsx" hidden>엑셀 올리기</button><button class="btn small" id="chatClose">닫기</button></span></div>
+<button id="chatOpen" hidden aria-label="몽이와 초롱이에게 물어보기"><span class="bubble">궁금한 건<br>몽이·초롱이에게 물어보세요</span><img src="helper.png" alt="" width="124"></button>
+<section id="chatBox" hidden aria-label="도우미 몽이와 초롱이">
+  <div class="chathead"><strong><img src="mong-face.png" alt="" width="38" height="38"><img src="chorong-face.png" alt="" width="38" height="38">몽이 · 초롱이</strong><span class="row"><button class="btn small" id="chatXlsx" hidden>엑셀 올리기</button><button class="btn small" id="chatClose">닫기</button></span></div>
   <div id="chatLog" aria-live="polite"></div>
   <div class="chatin"><input type="text" id="chatIn" maxlength="300" placeholder="궁금한 것을 적어 주세요" aria-label="도우미에게 물어볼 내용"><button class="btn primary" id="chatSend">보내기</button></div>
 </section>
@@ -1003,13 +1003,13 @@ function useSheet(c,say){
   const msg=importPaste(c.text);xlsxCands=[];commit();
   (say||(t=>{$('xlsxMsg').textContent=t}))(`"${c.name}" 시트에서 가져왔습니다. `+msg);
 }
-const AV='<span class="av" aria-hidden="true"><img src="chorong-face.png" alt=""><img src="mong-face.png" alt=""></span>';
+const AV='<span class="av" aria-hidden="true"><img src="mong-face.png" alt=""><img src="chorong-face.png" alt=""></span>';
 function renderChat(){
   const on=!!API&&!!code&&!gate;
   $('chatOpen').hidden=!on||chatOpen;$('chatBox').hidden=!on||!chatOpen;$('chatXlsx').hidden=!canEdit();
   if(!on||!chatOpen)return;
   const qs=['근무표는 어떻게 짜요?','빨간 글이 떴어요. 어떻게 고쳐요?','희망 휴무는 어떻게 넣어요?'];
-  $('chatLog').innerHTML=`<div class="hello"><img src="helper.png" alt="" width="150"><div class="msg a">안녕하세요. 휴무계획표 도우미 초롱이와 몽이예요.<br>쓰는 방법이 헷갈리거나 표에 빨간 글이 뜰 때 물어보세요.<br>저희는 AI라서 틀릴 수도 있습니다.</div></div>`+
+  $('chatLog').innerHTML=`<div class="hello"><img src="helper.png" alt="" width="150"><div class="msg a">안녕하세요. 휴무계획표 도우미 몽이와 초롱이예요.<br>쓰는 방법이 헷갈리거나 표에 빨간 글이 뜰 때 물어보세요.<br>저희는 AI라서 틀릴 수도 있습니다.</div></div>`+
     (chat.length?'':`<div class="qs">${qs.map(q=>`<button class="btn small" data-q="${q}">${q}</button>`).join('')}</div>`)+
     chat.map((c,i)=>(c.role==='user'?`<div class="msg u">${esc(c.content).replace(/\n/g,'<br>')}</div>`:`<div class="arow">${AV}<div class="msg a">${esc(c.content).replace(/\n/g,'<br>')}</div></div>`)+(c.chg?chgHtml(c,i):'')).join('')+
     (chatBusy?`<div class="arow">${AV}<div class="msg a">답을 쓰는 중입니다.</div></div>`:'');

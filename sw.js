@@ -1,5 +1,5 @@
 // 앱으로 설치할 수 있게 해 주는 파일. 항상 새 화면을 먼저 받아 오고, 인터넷이 끊겼을 때만 저장해 둔 화면을 보여 줍니다.
-const CACHE='hyumu-v2';
+const CACHE='hyumu-v3';
 self.addEventListener('install',()=>self.skipWaiting());
 self.addEventListener('activate',e=>e.waitUntil(self.clients.claim()));
 self.addEventListener('fetch',e=>{
