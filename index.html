@@ -212,6 +212,9 @@ main{padding-bottom:210px}
 .msg.u{align-self:flex-end;background:var(--accent);color:var(--accent-ink)}
 .qs{display:flex;flex-direction:column;align-items:flex-start;gap:6px}
 .qs .btn{text-align:left;background:var(--surface)}
+.chg{display:flex;flex-direction:column;gap:8px;align-self:flex-start;max-width:92%;background:var(--surface);border:1px solid var(--ink);padding:10px 12px}
+.chg ul{margin:0;padding-left:1.1em;display:flex;flex-direction:column;gap:3px;font-size:15px}
+.chg b{font-weight:700}
 .chatin{display:flex;gap:8px;padding:10px;border-top:1px solid var(--line)}
 .chatin input{flex:1;min-width:0;min-height:48px}
 body.m .savebox{order:5}
@@ -293,7 +296,12 @@ body.m.view .savebox{display:none}
     <ul class="list" id="issues"></ul>
   </section>
 
-  <details class="fold"><summary>엑셀에서 붙여넣기</summary><div class="rows">
+  <details class="fold"><summary>엑셀에서 가져오기</summary><div class="rows">
+    <strong>엑셀 파일 올리기</strong>
+    <span class="muted">쓰던 엑셀 파일(.xlsx)을 고르면, 지금 보고 있는 달의 표를 찾아서 채웁니다.</span>
+    <div class="row"><button class="btn primary" id="xlsxBtn">엑셀 파일 올리기</button><input type="file" id="xlsxFile" accept=".xlsx" hidden><span class="now" id="xlsxMsg"></span></div>
+    <div class="rows" id="xlsxPick"></div>
+    <strong>복사해서 붙여넣기</strong>
     <span class="muted">엑셀에서 이름 칸부터 마지막 날짜 칸까지 끌어서 복사한 뒤, 아래 칸에 붙여 넣고 "표에 넣기"를 누르세요. 지금 보고 있는 달의 표가 붙여 넣은 내용으로 바뀝니다. 이름이 같은 직원 줄에 들어가고, 없는 이름은 새 직원으로 추가됩니다.</span>
     <textarea id="pasteBox" rows="6" aria-label="엑셀에서 복사한 내용" placeholder="여기에 붙여 넣으세요"></textarea>
     <div class="row"><button class="btn primary" id="pasteApply">표에 넣기</button><span class="now" id="pasteMsg"></span></div>
@@ -316,7 +324,7 @@ body.m.view .savebox{display:none}
 
 <button id="chatOpen" hidden aria-label="도우미에게 물어보기"><span class="bubble">궁금한 건<br>저에게 물어보세요</span><img src="helper.png" alt="" width="96"></button>
 <section id="chatBox" hidden aria-label="도우미">
-  <div class="chathead"><strong><img src="helper-face.png" alt="" width="40" height="40">도우미</strong><button class="btn small" id="chatClose">닫기</button></div>
+  <div class="chathead"><strong><img src="helper-face.png" alt="" width="40" height="40">도우미</strong><span class="row"><button class="btn small" id="chatXlsx" hidden>엑셀 올리기</button><button class="btn small" id="chatClose">닫기</button></span></div>
   <div id="chatLog" aria-live="polite"></div>
   <div class="chatin"><input type="text" id="chatIn" maxlength="300" placeholder="궁금한 것을 적어 주세요" aria-label="도우미에게 물어볼 내용"><button class="btn primary" id="chatSend">보내기</button></div>
 </section>
@@ -422,7 +430,7 @@ function check(k){
   return r;
 }
 
-let installEvt=null;
+let installEvt=null,xlsxCands=[];
 let pickMin=null,openCal=null,lastPer=0,lastMobile=false,mMode='view',mWho=null,mDay=null;
 function isMobile(){return typeof window!=='undefined'&&(window.innerWidth||1100)<700}
 function calHtml(k,mo,r,id){
@@ -488,6 +496,7 @@ function render(){
   const showInstall=!gate&&!standalone&&!LS.get('hyumu-noinstall')&&(!!installEvt||ios);
   $('installBox').hidden=!showInstall;$('installBtn').hidden=!installEvt;
   $('installText').textContent=installEvt?'"앱 설치"를 누르면 휴대폰 홈 화면에 아이콘이 생기고, 앱처럼 열립니다.':'아이폰: 사파리 아래쪽의 공유 버튼(네모에 화살표)을 누른 뒤 "홈 화면에 추가"를 누르면 홈 화면에 아이콘이 생깁니다.';
+  $('xlsxPick').innerHTML=xlsxCands.map((c,i)=>`<div class="row"><button class="btn small" data-xpick="${i}">${esc(c.name)}${c.title?` (${c.title.y}년 ${c.title.m}월)`:''} · ${c.count}명</button></div>`).join('');
   $('adminRow').hidden=!API||!!admin||gate;$('adminForm').hidden=!adminAsk;$('adminMsg').textContent=adminMsg;
   if(mWho===null)mWho=S.mWho||null;
   if(mWho!=='all'&&!mo.staff.some(s=>s.id===mWho))mWho=mo.staff[0]?mo.staff[0].id:'all';
@@ -869,21 +878,131 @@ async function sendChat(text){
   text=(text||'').trim();if(!text||chatBusy)return;
   chat.push({role:'user',content:text});chatBusy=true;renderChat();
   try{
-    const j=await api('/chat',{messages:chat.slice(-12).map(c=>({role:c.role,content:c.content})),context:chatCtx()});
-    chat.push({role:'assistant',content:j.reply||'답을 받지 못했습니다. 다시 물어봐 주세요.'});
+    const j=await api('/chat',{messages:chat.slice(-12).map(c=>({role:c.role,content:c.content})),context:chatCtx(),table:canEdit()?tableText():undefined});
+    const p=Array.isArray(j.changes)?planChanges(j.changes):null;
+    if(p&&p.list.length)chat.push({role:'assistant',content:j.reply||'아래처럼 바꿀까요?',chg:p.list,miss:p.miss,state:'ask',month:S.cur});
+    else chat.push({role:'assistant',content:(j.reply||'답을 받지 못했습니다. 다시 물어봐 주세요.')+(p&&p.miss.length?'\n(표에서 찾지 못한 이름: '+p.miss.join(', ')+')':'')});
   }catch(e){
     chat.push({role:'assistant',content:e.code==='limit'?'오늘은 도우미 사용 횟수를 다 썼습니다. 내일 다시 물어봐 주세요.':'지금은 답을 드리지 못했습니다. 잠시 뒤 다시 물어봐 주세요.'});
   }
   chatBusy=false;renderChat();
 }
+function tableText(){
+  const k=S.cur,m=S.months[k],n=nDays(k),[y,mm]=ym(k);
+  return `${y}년 ${mm}월 (1일은 ${DOW[dow(k,1)]}요일, ${n}일까지). 적히지 않은 날은 빈칸(정상 근무)입니다.\n`+
+    m.staff.map(s=>{const a=[];for(let d=1;d<=n;d++){const v=m.cells[s.id+'|'+d];if(v)a.push(d+'='+v)}return s.name+(s.manual?'(자동 추천 제외)':'')+': '+(a.join(' ')||'(모두 빈칸)')}).join('\n');
+}
+function planChanges(arr){
+  const m=mo(),n=nDays(S.cur),norm=x=>String(x||'').replace(/\s+/g,''),list=[],miss=[];
+  arr.slice(0,60).forEach(c=>{
+    const st=m.staff.find(s=>norm(s.name)===norm(c.name)),d=Math.round(Number(c.day));
+    if(!st){if(c.name&&!miss.includes(c.name))miss.push(String(c.name));return}
+    if(!(d>=1&&d<=n))return;
+    let to=String(c.value==null?'':c.value).trim().slice(0,5);if(/^[dabc]$/i.test(to))to=to.toUpperCase();
+    const key=st.id+'|'+d,from=m.cells[key]||'';
+    if(from!==to)list.push({key,name:st.name,day:d,from,to});
+  });
+  return {list,miss};
+}
+function chgHtml(c,i){
+  const lab=v=>v===''?'정상 근무':v;
+  const items=c.chg.map(x=>`<li><b>${esc(x.name)} ${x.day}일</b>: ${esc(lab(x.from))} → <b>${esc(lab(x.to))}</b></li>`).join('');
+  const foot=c.state==='ask'?`<div class="row"><button class="btn primary" data-chg="${i}:apply">바꾸기</button><button class="btn small" data-chg="${i}:cancel">취소</button></div>`
+    :c.state==='done'?`<span class="muted">표를 바꿨습니다. 맨 위 "적용하기"를 눌러야 직원 화면에 나옵니다.</span><div class="row"><button class="btn small" data-chg="${i}:undo">되돌리기</button></div>`
+    :c.state==='undone'?'<span class="muted">되돌렸습니다.</span>':'<span class="muted">바꾸지 않았습니다.</span>';
+  return `<div class="chg"><ul>${items}</ul>${c.miss&&c.miss.length?`<span class="muted">표에서 찾지 못한 이름: ${esc(c.miss.join(', '))}</span>`:''}${foot}</div>`;
+}
+function doChange(i,act){
+  const c=chat[i];if(!c||!c.chg||!canEdit())return;
+  const m=S.months[c.month];if(!m)return;
+  if(!m.wish)m.wish={};if(!m.gen)m.gen={};
+  const setv=(key,v)=>{if(v)m.cells[key]=v;else delete m.cells[key];delete m.wish[key];delete m.gen[key]};
+  if(act==='apply'&&c.state==='ask'){c.chg.forEach(x=>setv(x.key,x.to));c.state='done';recMsg='';commit()}
+  else if(act==='undo'&&c.state==='done'){c.chg.forEach(x=>setv(x.key,x.from));c.state='undone';commit()}
+  else if(act==='cancel'&&c.state==='ask'){c.state='cancel';renderChat()}
+}
+// ---- 엑셀 파일 읽기
+async function readXlsx(file){
+  const zip=await JSZip.loadAsync(await file.arrayBuffer());
+  const xml=async p=>{const f=zip.file(p);return f?new DOMParser().parseFromString(await f.async('string'),'application/xml'):null};
+  const texts=el=>[...el.getElementsByTagName('t')].filter(t=>t.parentNode.nodeName!=='rPh').map(t=>t.textContent).join('');
+  const wb=await xml('xl/workbook.xml'),rels=await xml('xl/_rels/workbook.xml.rels');
+  if(!wb||!rels)throw new Error('not xlsx');
+  const relMap={};[...rels.getElementsByTagName('Relationship')].forEach(r=>{relMap[r.getAttribute('Id')]=r.getAttribute('Target')});
+  const ss=await xml('xl/sharedStrings.xml'),strings=ss?[...ss.getElementsByTagName('si')].map(texts):[];
+  const sheets=[];
+  for(const sh of [...wb.getElementsByTagName('sheet')]){
+    let target=relMap[sh.getAttribute('r:id')];if(!target)continue;
+    target=target.replace(/^\//,'');if(!target.startsWith('xl/'))target='xl/'+target;
+    const doc=await xml(target);if(!doc)continue;
+    const grid={};let maxR=0;
+    for(const c of [...doc.getElementsByTagName('c')]){
+      const mm=(c.getAttribute('r')||'').match(/^([A-Z]+)(\d+)$/);if(!mm)continue;
+      let col=0;for(const ch of mm[1])col=col*26+ch.charCodeAt(0)-64;
+      const row=Number(mm[2]),t=c.getAttribute('t'),vEl=c.getElementsByTagName('v')[0];let val='';
+      if(t==='s')val=strings[Number(vEl&&vEl.textContent)]||'';
+      else if(t==='inlineStr')val=texts(c);
+      else if(vEl){
+        const raw=vEl.textContent,num=Number(raw);
+        if(t==='str'||isNaN(num))val=raw;
+        else if(num>0&&num<1){const mins=Math.round(num*1440);val=Math.floor(mins/60)+':'+String(mins%60).padStart(2,'0')}
+        else val=String(num);
+      }
+      val=String(val).trim();if(val==='')continue;
+      (grid[row]=grid[row]||{})[col]=val;if(row>maxR)maxR=row;
+    }
+    sheets.push({name:sh.getAttribute('name')||'',grid,maxR});
+  }
+  return sheets;
+}
+function sheetTable(sh){
+  for(let r=1;r<=Math.min(sh.maxR,60);r++){
+    const row=sh.grid[r];if(!row)continue;
+    const cols=Object.keys(row).map(Number).sort((a,b)=>a-b);
+    const c1=cols.find(c=>row[c]==='1'&&row[c+1]==='2'&&row[c+2]==='3');
+    if(!c1)continue;
+    const nameCol=cols.filter(c=>c<c1).pop()||c1-1;
+    let last=31;while(last>28&&row[c1+last-1]!==String(last))last--;
+    let title=null;
+    for(let rr=1;rr<r&&!title;rr++)for(const v of Object.values(sh.grid[rr]||{})){const t=String(v).match(/(\d{2,4})\s*년\s*(\d{1,2})\s*월/);if(t){title={y:Number(t[1])%100,m:Number(t[2])};break}}
+    const lines=[];
+    for(let rr=r+1;rr<=Math.min(sh.maxR,r+40);rr++){
+      const x=sh.grid[rr];if(!x)continue;
+      const name=(x[nameCol]||'').replace(/\s+/g,'');
+      if(!name||/시차|휴무|:/.test(name))continue;
+      const vals=[];let any=false;for(let d=1;d<=last;d++){const v=x[c1+d-1]||'';if(v)any=true;vals.push(v)}
+      if(any)lines.push(name+'\t'+vals.join('\t'));
+    }
+    if(lines.length)return {name:sh.name,title,days:last,count:lines.length,text:lines.join('\n')};
+  }
+  return null;
+}
+async function loadXlsx(file){
+  const say=t=>{$('xlsxMsg').textContent=t;if(chatOpen){chat.push({role:'assistant',content:t});renderChat()}};
+  xlsxCands=[];
+  if(!file)return;
+  if(typeof JSZip==='undefined')return say('파일을 읽는 기능을 불러오지 못했습니다. 새로고침한 뒤 다시 해 주세요.');
+  let sheets;
+  try{sheets=await readXlsx(file)}catch(e){render();return say('엑셀 파일(.xlsx)을 읽지 못했습니다. 파일을 확인해 주세요.')}
+  const cands=sheets.map(sheetTable).filter(Boolean),[y,m]=ym(S.cur);
+  if(!cands.length){render();return say('이 파일에서 근무표를 찾지 못했습니다. 날짜가 1, 2, 3 순서로 적힌 줄이 있어야 합니다.')}
+  const hit=cands.filter(c=>c.title&&c.title.y===y%100&&c.title.m===m);
+  if(hit.length===1||cands.length===1&&!cands[0].title){useSheet(hit[0]||cands[0],say);return}
+  xlsxCands=cands;render();
+  say(`${y%100}년 ${m}월이라고 적힌 표를 찾지 못했습니다. 아래 "엑셀에서 가져오기" 칸에서 넣을 시트를 골라 주세요.`);
+}
+function useSheet(c,say){
+  const msg=importPaste(c.text);xlsxCands=[];commit();
+  (say||(t=>{$('xlsxMsg').textContent=t}))(`"${c.name}" 시트에서 가져왔습니다. `+msg);
+}
 function renderChat(){
   const on=!!API&&!!code&&!gate;
-  $('chatOpen').hidden=!on||chatOpen;$('chatBox').hidden=!on||!chatOpen;
+  $('chatOpen').hidden=!on||chatOpen;$('chatBox').hidden=!on||!chatOpen;$('chatXlsx').hidden=!canEdit();
   if(!on||!chatOpen)return;
   const qs=['근무표는 어떻게 짜요?','빨간 글이 떴어요. 어떻게 고쳐요?','희망 휴무는 어떻게 넣어요?'];
   $('chatLog').innerHTML=`<div class="hello"><img src="helper.png" alt="" width="84"><div class="msg a">안녕하세요. 휴무계획표 도우미입니다.<br>쓰는 방법이 헷갈리거나 표에 빨간 글이 뜰 때 물어보세요.<br>저는 AI라서 틀릴 수도 있습니다.</div></div>`+
     (chat.length?'':`<div class="qs">${qs.map(q=>`<button class="btn small" data-q="${q}">${q}</button>`).join('')}</div>`)+
-    chat.map(c=>`<div class="msg ${c.role==='user'?'u':'a'}">${esc(c.content).replace(/\n/g,'<br>')}</div>`).join('')+
+    chat.map((c,i)=>`<div class="msg ${c.role==='user'?'u':'a'}">${esc(c.content).replace(/\n/g,'<br>')}</div>`+(c.chg?chgHtml(c,i):'')).join('')+
     (chatBusy?'<div class="msg a">답을 쓰는 중입니다.</div>':'');
   $('chatLog').scrollTop=$('chatLog').scrollHeight;
 }
@@ -941,6 +1060,9 @@ document.addEventListener('click',e=>{
   if((!canEdit()||isMobile()&&mMode==='view')&&('c' in d||'d' in d)){mDay=Number('c' in d?d.c.split('|')[1]:d.d);return render()}
   if('b' in d){brush=d.b;return render()}
   if(t.id==='saveDoc'){saveDoc();return}
+  if(t.id==='xlsxBtn'||t.id==='chatXlsx'){$('xlsxFile').value='';$('xlsxFile').click();return}
+  if('xpick' in d){const c=xlsxCands[Number(d.xpick)];if(c)useSheet(c);return}
+  if('chg' in d){const [i,act]=d.chg.split(':');return doChange(Number(i),act)}
   if(t.id==='pasteApply'){const msg=importPaste($('pasteBox').value);commit();$('pasteMsg').textContent=msg;return}
   if(t.id==='recommend'){recommend();return commit()}
   if(t.id==='clearRec'){clearRec(m);recMsg='추천으로 채운 칸을 지웠습니다.';return commit()}
@@ -999,6 +1121,7 @@ document.addEventListener('click',e=>{
 
 document.addEventListener('change',e=>{
   if(!canEdit())return;
+  if(e.target.id==='xlsxFile')return loadXlsx(e.target.files&&e.target.files[0]);
   const t=e.target,m=mo(),d=t.dataset,num=(lo,hi)=>Math.min(hi,Math.max(lo,Math.round(Number(t.value)||0)));
   if(t.id==='offTarget'){m.off=num(0,31);return commit()}
   if(t.id==='customLabel'){S.custom=t.value.trim();brush='custom';return commit()}
