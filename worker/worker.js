@@ -48,10 +48,44 @@ D는 휴무, D 옆의 점은 직원이 희망한 휴무, A와 B는 시차 근무
 - 직원이 바뀌면 맨 아래 "직원 추가·삭제"를 엽니다.
 - 같이 쉬면 안 되는 직원, 최소 출근 인원, 시차 시간은 맨 아래 "규칙"에서 바꿉니다.
 - 표에서 날짜 숫자를 누르면 그날 메모(예: 재고)를 적을 수 있습니다.
-- 엑셀로 이미 짠 표가 있으면 맨 아래 "엑셀에서 붙여넣기"를 엽니다. 엑셀에서 이름 칸부터 마지막 날짜 칸까지 복사해 붙여 넣고 "표에 넣기"를 누릅니다.
+- 엑셀로 이미 짠 표가 있으면 맨 아래 "엑셀에서 가져오기"를 엽니다. "엑셀 파일 올리기"를 눌러 파일을 고르면 지금 보는 달의 표가 채워집니다. 도우미 창 위의 "엑셀 올리기"를 눌러도 됩니다. 파일 대신 엑셀에서 이름 칸부터 마지막 날짜 칸까지 복사해 붙여 넣고 "표에 넣기"를 눌러도 됩니다.
+- 관리자는 도우미에게 말로 일정을 바꿔 달라고 할 수 있습니다. 예: "홍길동 5일 휴무로 바꿔 줘". 도우미가 바꿀 내용을 보여 주면 "바꾸기"를 누릅니다. 잘못 바꿨으면 "되돌리기"를 누릅니다.
 
 [휴대폰 - 직원]
 이름을 누르면 그 사람의 한 달 근무가 달력으로 나옵니다. 날짜를 누르면 그날 누가 쉬고 누가 나오는지 나옵니다. "전체 표"를 누르면 모든 직원의 표가 나옵니다.`;
+
+const EDIT_RULES = `일정 바꾸기 (관리자가 부탁했을 때만):
+- 사용자가 일정을 바꿔 달라고 하면 propose_changes 도구로 바꿀 칸을 제안합니다. 사용법만 묻는 질문에는 도구를 쓰지 않습니다.
+- 이름은 아래 근무표에 적힌 그대로 씁니다. 성을 빼고 부르거나 조금 다르게 불러도, 표에서 한 사람으로 분명히 정해지면 그 이름을 씁니다.
+- "휴무", "쉬는 날"은 D입니다. "정상 근무", "지워 줘"는 빈 문자열입니다. "늦게 출근"은 A, "일찍 퇴근"은 B입니다.
+- 두 날을 서로 바꿔 달라고 하면 두 칸을 각각 바꿉니다. 두 사람의 일정을 맞바꿔 달라고 하면 두 사람의 칸을 각각 바꿉니다.
+- 이름이나 날짜가 분명하지 않으면 도구를 쓰지 말고 다시 물어봅니다.
+- 도구를 쓸 때 "바꿨습니다"라고 말하지 않습니다. 사용자가 화면에서 "바꾸기"를 눌러야 바뀝니다. "아래처럼 바꿀까요?"처럼 말합니다.
+- 바꾸면 규칙(하루 최소 출근 인원, 같이 쉬면 안 되는 직원, 휴무 일수)에 어긋나게 되면 그 점을 한 줄로 알려 줍니다.`;
+
+const EDIT_TOOL = {
+  name: 'propose_changes',
+  description: '근무표의 칸을 바꾸자고 제안한다. 사용자가 일정 변경을 부탁했을 때만 쓴다. 실제로 바뀌는 것은 사용자가 화면에서 "바꾸기"를 누른 뒤다.',
+  input_schema: {
+    type: 'object',
+    properties: {
+      summary: { type: 'string', description: '무엇을 바꾸려는지 한두 문장. 존댓말.' },
+      changes: {
+        type: 'array',
+        items: {
+          type: 'object',
+          properties: {
+            name: { type: 'string', description: '근무표에 적힌 직원 이름 그대로' },
+            day: { type: 'integer', description: '날짜 (1~31)' },
+            value: { type: 'string', description: '넣을 값. D, A, B, C, 연차, 교육, 검진, 노조, 병가, 회의, 근속, 안전, 감정, 또는 12:00 같은 시각. 빈칸(정상 근무)으로 만들려면 빈 문자열.' },
+          },
+          required: ['name', 'day', 'value'],
+        },
+      },
+    },
+    required: ['summary', 'changes'],
+  },
+};
 
 const json = (obj, status, cors) =>
   new Response(JSON.stringify(obj), { status, headers: { 'content-type': 'application/json; charset=utf-8', ...cors } });
@@ -118,6 +152,18 @@ export default {
       if (!msgs.length || msgs[msgs.length - 1].role !== 'user') return json({ error: 'bad_request' }, 400, cors);
 
       const context = typeof b.context === 'string' ? b.context.slice(0, 3000) : '';
+      // 관리자가 표를 함께 보내면, 말로 일정을 바꾸는 제안을 할 수 있게 한다
+      const table = isAdmin && typeof b.table === 'string' ? b.table.slice(0, 6000) : '';
+      const payload = {
+        model: env.MODEL || 'claude-haiku-5-5',
+        max_tokens: table ? 1200 : 700,
+        system: SYSTEM + '\n\n지금 화면 상태:\n' + (context || '(알 수 없음)') + (table ? '\n\n' + EDIT_RULES + '\n\n이번 달 근무표:\n' + table : ''),
+        messages: msgs,
+      };
+      if (table) {
+        payload.tools = [EDIT_TOOL];
+        payload.tool_choice = { type: 'auto', disable_parallel_tool_use: true };
+      }
       const r = await fetch('https://api.anthropic.com/v1/messages', {
         method: 'POST',
         headers: {
@@ -125,18 +171,24 @@ export default {
           'anthropic-version': '2026-10-21',
           'content-type': 'application/json',
         },
-        body: JSON.stringify({
-          model: env.MODEL || 'claude-haiku-5-5',
-          max_tokens: 700,
-          system: SYSTEM + '\n\n지금 화면 상태:\n' + (context || '(알 수 없음)'),
-          messages: msgs,
-        }),
+        body: JSON.stringify(payload),
       });
       if (!r.ok) return json({ error: 'ai_error', status: r.status }, 502, cors);
       const out = await r.json();
-      const reply = (out.content || []).filter((c) => c.type === 'text').map((c) => c.text).join('').trim();
+      const blocks = out.content || [];
+      let reply = blocks.filter((c) => c.type === 'text').map((c) => c.text).join('').trim();
+      let changes = null;
+      const tu = blocks.find((c) => c.type === 'tool_use' && c.name === 'propose_changes');
+      if (tu && tu.input && Array.isArray(tu.input.changes)) {
+        changes = tu.input.changes.slice(0, 60).map((c) => ({
+          name: String((c && c.name) || ''),
+          day: Number(c && c.day),
+          value: String(c && c.value != null ? c.value : '').slice(0, 5),
+        }));
+        if (!reply) reply = String(tu.input.summary || '아래처럼 바꿀까요?');
+      }
       await env.DB.put(dayKey, String(used + 1), { expirationTtl: 172800 });
-      return json({ reply }, 200, cors);
+      return json({ reply, changes }, 200, cors);
     }
 
     return json({ error: 'not_found' }, 404, cors);
