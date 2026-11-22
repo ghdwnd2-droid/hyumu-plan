@@ -118,6 +118,7 @@ td.c.D{background:var(--off-bg)} td.c.D button{color:var(--off)}
 td.c.W button::after{content:"";position:absolute;right:3px;top:4px;width:6px;height:6px;border-radius:50%;background:var(--off)}
 td.c.S button{color:var(--shift)}
 td.c.L button{color:var(--label);font-size:11px;font-weight:700;letter-spacing:-.04em}
+td.c.R{background:var(--off-bg)} td.c.R button{color:var(--off)}
 td.c.T button{color:var(--ink);font-weight:500;letter-spacing:-.06em}
 td.c.viol{box-shadow:inset 0 0 0 2px var(--bad)}
 .blk .sum{font-weight:700;border-left:1px solid var(--ink);font-size:14px}
@@ -152,7 +153,7 @@ table.cal{width:100%;table-layout:fixed;border-collapse:collapse;border:1px soli
 .cal td.pad{background:var(--bg)}
 .cal td.hol{background:var(--holiday)}
 .cal td.closed{background:var(--closed)}
-.cal td.c.D{background:var(--off-bg)}
+.cal td.c.D,.cal td.c.R{background:var(--off-bg)}
 .cal td.c button{height:63px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;font-size:20px}
 .cal td.c.L button{font-size:14px}
 .cal .dn{font-family:var(--display);font-size:13px;color:var(--muted);font-weight:500}
@@ -324,7 +325,8 @@ body.m.view .savebox{display:none}
 <script>
 const KEY='hyumu-plan-v1';
 const LABELS=['연차','검진','교육','노조','병가','회의','근속','안전','감정'];
-const REST=new Set(['D','연차','병가','근속']);      // 쉬는 날로 보는 값
+const REST=new Set(['D','연차','병가','근속','감정']);
+const OFFLIKE=new Set(['감정','근속']);          // 휴무와 같은 색으로 보여 줄 값      // 쉬는 날로 보는 값
 const WORK=new Set(['','A','B','C']);
 const isTime=v=>/^\d{1,2}:\d{2}$/.test(v);
 const isWork=v=>WORK.has(v)||isTime(v);   // 시각(예: 12:00)이 적힌 칸도 출근                 // 출근으로 보는 값
@@ -433,7 +435,7 @@ function calHtml(k,mo,r,id){
     if(v)cnt[v]=(cnt[v]||0)+1;
     const cls=['c'];
     if(v==='D')cls.push('D');else if(v==='A'||v==='B'||v==='C')cls.push('S');else if(isTime(v))cls.push('L','T');else if(v)cls.push('L');
-    if(v==='D'&&mo.wish[key])cls.push('W');
+    if(OFFLIKE.has(v))cls.push('R');if(v==='D'&&mo.wish[key])cls.push('W');
     if(r.cellBad.has(key))cls.push('viol');
     if(mo.closed.includes(d))cls.push('closed');else if(w===0||w===6||mo.hol.includes(d))cls.push('hol');
     if(d===today)cls.push('today');
@@ -450,7 +452,7 @@ function dayHtml(k,mo,d){
   mo.staff.forEach(s=>{
     const v=mo.cells[s.id+'|'+d]||'';
     if(isWork(v))work.push({n:s.name,t:v===''?'':isTime(v)?v:v+' 시차'});
-    else if(v==='D')off.push(s.name);
+    else if(v==='D'||OFFLIKE.has(v))off.push(v==='D'?s.name:s.name+' ('+v+')');
     else (etc[v]=etc[v]||[]).push(s.name);
   });
   const closed=mo.closed.includes(d);
@@ -538,7 +540,7 @@ function render(){
         const key=s.id+'|'+d,v=mo.cells[key]||'';
         const cls=['c'];
         if(v==='D')cls.push('D');else if(v==='A'||v==='B'||v==='C')cls.push('S');else if(isTime(v))cls.push('L','T');else if(v)cls.push('L');
-        if(v==='D'&&mo.wish[key])cls.push('W');
+        if(OFFLIKE.has(v))cls.push('R');if(v==='D'&&mo.wish[key])cls.push('W');
         if(r.cellBad.has(key))cls.push('viol');
         h+=`<td class="${cls.join(' ')}"><button data-c="${key}" aria-label="${esc(s.name)} ${d}일 ${v||'근무'}${mo.wish[key]?' 희망':''}">${esc(v)}</button></td>`;
       }
@@ -557,7 +559,7 @@ function render(){
   $('mday').innerHTML=showDay?dayHtml(k,mo,mDay):'';
 
   $('legend').innerHTML=`<span>A 시차 : ${esc(st.times.A)}</span><span>B 시차 : ${esc(st.times.B)}</span>`+
-    (st.useC?`<span>C 시차 : ${esc(st.times.C)}</span>`:'')+`<span>D : 휴무</span><span>D● : 직원이 희망한 휴무</span><span>빈칸 : 정상 근무</span>`;
+    (st.useC?`<span>C 시차 : ${esc(st.times.C)}</span>`:'')+`<span>D·근속·감정 : 휴무</span><span>D● : 직원이 희망한 휴무</span><span>빈칸 : 정상 근무</span>`;
 
   const dp=$('daypanel');
   if(selDay&&selDay<=n){
@@ -623,7 +625,7 @@ function render(){
     <strong>같이 쉬면 안 되는 직원</strong>
     ${st.pairs.map((p,i)=>`<div class="row"><span>${nm(p[0])} · ${nm(p[1])}</span><button class="btn small danger" data-delpair="${i}">삭제</button></div>`).join('')||'<span class="muted">정한 조합이 없습니다.</span>'}
     <div class="row">${sel('pairA')}${sel('pairB')}<button class="btn small primary" id="addPair">조합 추가</button></div>
-    <span class="muted">D·연차·병가·근속이 같은 날 겹치면 위반으로 표시합니다. 휴점일은 제외합니다. 출근 인원은 빈칸, A·B·C, 시각(예: 12:00)이 적힌 칸을 셉니다.</span>
+    <span class="muted">D·연차·병가·근속·감정이 같은 날 겹치면 위반으로 표시합니다. 휴점일은 제외합니다. 출근 인원은 빈칸, A·B·C, 시각(예: 12:00)이 적힌 칸을 셉니다.</span>
     <div class="row"><button class="btn small danger" id="reset">${pendingDel==='__reset'?'한 번 더 누르면 전부 지움':'처음 상태로 되돌리기'}</button></div>`;
 
   $('saveinfo').textContent=API?'':saveOk
